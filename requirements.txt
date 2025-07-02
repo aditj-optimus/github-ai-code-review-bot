@@ -1,0 +1,16 @@
+# Core Azure SDKs
+azure-identity
+azure-keyvault-secrets
+
+# HTTP and JWT
+requests
+pyjwt
+
+# Logging
+opencensus-ext-azure
+
+# For Azure Functions (if running locally)
+azure-functions
+
+# YAML parsing (for .guidelines.yml support)
+pyyaml

@@ -1,0 +1,104 @@
+# Python Code & GitHub Commit Guidelines  
+**Optimus Information Inc. – App Dev Team – Noida**  
+_Last updated: June 30, 2025_
+
+---
+
+## ✅ Coding Standards
+
+### 1. Follow PEP8
+- Indentation: 4 spaces (no tabs)
+- Max line length: 88 characters (black formatter standard)
+- Imports:
+  ```python
+  # standard lib
+  import os
+  import sys
+
+  # third-party
+  import requests
+
+  # internal
+  from app.models import User
+2. Function & Variable Naming
+Use snake_case for variables and functions
+
+Use PascalCase for classes
+
+Prefix private methods/vars with _
+
+3. Type Hints
+Mandatory for all functions
+
+def get_user(id: int) -> Optional[User]:
+    ...
+4. Error Handling
+Always use specific exceptions
+
+Log all handled exceptions with context
+
+try:
+    process_user(data)
+except ValueError as e:
+    logger.error(f"Invalid user input: {e}")
+
+🔁 GitHub Workflow Guidelines
+1. Branching Strategy
+Use feature branches:
+
+feature/issue-123-api-pagination
+bugfix/login-timeout
+refactor/db-models
+Always branch from develop (not main)
+
+2. Commit Message Format
+Use Conventional Commits
+<type>(scope): short message
+
+BODY (optional)
+Examples:
+
+feat(api): add token refresh support
+
+fix(ui): resolve dark mode toggle bug
+
+refactor(auth): cleanup token validation logic
+
+Types allowed: feat, fix, refactor, chore, docs, test
+
+3. Pull Request Checklist
+Before opening a PR:
+
+ Code builds and passes tests
+
+ Proper linting (black, flake8)
+
+ Added/updated docstrings and comments
+
+ PR title uses Conventional Commit format
+
+ Linked related issue: Closes #123
+
+4. Review Comments
+All review feedback must be addressed before merging
+
+Do not ignore Request Changes flags
+
+Use GitHub suggestions where possible
+
+🧪 Testing & CI
+Minimum 80% test coverage
+
+Use pytest with clear test naming: test_<feature>_<scenario>()
+
+Add tests for edge cases and failure paths
+
+💡 Additional Notes
+Use .env and avoid hardcoding secrets
+
+Avoid pushing .pyc, .log, node_modules, etc.
+
+Ensure .gitignore is updated for Python
+
+Maintainer: App Dev TL – Optimus Noida
+Last Reviewed: June 30, 2025

@@ -1,0 +1,28 @@
+{
+  "input": {
+    "type": "object",
+    "properties": {
+      "commit_msg": {
+        "type": "string",
+        "description": "Commit message of the PR"
+      },
+      "code_diff": {
+        "type": "string",
+        "description": "Code diff or patch content from PR"
+      },
+      "project_name": {
+        "type": "string",
+        "description": "Name of the project or microservice"
+      },
+      "language": {
+        "type": "string",
+        "description": "Detected programming language (optional if auto-detected)"
+      }
+    },
+    "required": ["commit_msg", "code_diff", "project_name", "language"]
+  },
+  "output": {
+    "type": "string",
+    "description": "Generated code review comment"
+  }
+}

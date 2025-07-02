@@ -1,0 +1,96 @@
+id: template_standard_flow
+name: Template Standard Flow
+inputs:
+  commit_msg:
+    type: string
+    default: ""
+    is_chat_input: false
+  code_diff:
+    type: string
+    default: ""
+    is_chat_input: false
+  language:
+    type: string
+    default: ""
+    is_chat_input: false
+  project_name:
+    type: string
+    default: ""
+    is_chat_input: false
+outputs:
+  review_comment:
+    type: string
+    reference: ${format_review_output.output}
+nodes:
+- name: language_project_query
+  type: python
+  source:
+    type: code
+    path: language_project_query.py
+  inputs:
+    language: ${inputs.language}
+    project_name: ${inputs.project_name}
+  use_variants: false
+- name: guidelines_retriever
+  type: python
+  source:
+    type: package
+    tool: promptflow_vectordb.tool.common_index_lookup.search
+  inputs:
+    mlindex_content: >
+      embeddings:
+        kind: none
+        schema_version: '2'
+      index:
+        api_version: 2024-05-01-preview
+        connection:
+          id: /subscriptions/96bac434-dd2c-4740-9337-09e4d039d4d6/resourceGroups/rg-aditjain-0684_ai/providers/Microsoft.MachineLearningServices/workspaces/aditjain-3239/connections/aicodereviewsearch
+        connection_type: workspace_connection
+        endpoint: https://aicodereview-search.search.windows.net/
+        engine: azure-sdk
+        field_mapping:
+          content: content
+          embedding: null
+          metadata: null
+        index: guideline-index
+        kind: acs
+        semantic_configuration_name: null
+    queries: ${language_project_query.output}
+    query_type: Keyword
+    top_k: 3
+  use_variants: false
+- name: gpt4o_reviewer
+  type: llm
+  source:
+    type: code
+    path: gpt4o_reviewer.jinja2
+  inputs:
+    deployment_name: gpt-4o
+    temperature: 0.5
+    top_p: 1
+    max_tokens: 1200
+    response_format:
+      type: text
+    code_diff: ${inputs.commit_msg}
+    commit_msg: ${inputs.commit_msg}
+    language: ${inputs.language}
+    project_name: ${inputs.project_name}
+    retrieved_docs: ${guidelines_retriever.output}
+  provider: AzureOpenAI
+  connection: ai-aditjain6758ai010171060837_aoai
+  api: chat
+  module: promptflow.tools.aoai
+  use_variants: false
+- name: format_review_output
+  type: python
+  source:
+    type: code
+    path: format_review_output.py
+  inputs:
+    language: ${inputs.language}
+    project_name: ${inputs.project_name}
+    review_comment: ${gpt4o_reviewer.output}
+  use_variants: false
+node_variants: {}
+environment:
+  python_requirements_txt: requirements.txt
