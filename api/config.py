@@ -19,7 +19,8 @@ APP_METADATA = {
     "key_vault_url": os.getenv("KEY_VAULT_URL", "https://ai-review-vault-main.vault.azure.net/"),
     "installation_id": 73640100,
     "github_username": "aditj-optimus",
-    "repo_name": "github-ai-code-review-bot"
+    "repo_name": "github-ai-code-review-bot",
+    "code_fix_prompt_flow_endpoint": "https://code-fix-flow.eastus2.inference.ml.azure.com/score"
 }
 
 # Configure logging
@@ -80,3 +81,7 @@ def get_secret(name: str, max_retries: int = 3, backoff_factor: float = 2.0) -> 
 # Reference:
 # https://learn.microsoft.com/en-us/azure/key-vault/secrets/quick-create-python
 # https://github.com/Azure/azure-sdk-for-python/tree/main/sdk/keyvault/azure-keyvault-secrets
+
+# CODE_FIX_PROMPT_FLOW_ENDPOINT and CODE_FIX_PROMPT_FLOW_API_KEY are now loaded from environment or Key Vault for code-fix integration.
+CODE_FIX_PROMPT_FLOW_ENDPOINT = os.getenv("CODE_FIX_PROMPT_FLOW_ENDPOINT") or APP_METADATA.get("code_fix_prompt_flow_endpoint") or "https://code-fix-flow.eastus2.inference.ml.azure.com/score"
+CODE_FIX_PROMPT_FLOW_API_KEY = get_secret("prompt-flow-api-key-2")

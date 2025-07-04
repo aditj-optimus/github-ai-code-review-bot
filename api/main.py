@@ -154,6 +154,86 @@ def main(req):
         logger.error(f"Failed to post PR comment: {e}")
         return {"status": 500, "body": "Failed to post PR comment."}
 
+    # Post follow-up comment with fix options
+    try:
+        fix_options_comment = (
+            "\n---\n"
+            "### 🛠️ Want to fix issues automatically?\n"
+            "Comment `/apply-fix` to let the bot suggest a patch (no commit).\n"
+            "Comment `/apply-and-commit` to let the bot apply and commit the fix to this branch.\n"
+            "\n> Only users with write access can trigger these actions."
+        )
+        post_pr_comment(owner, repo, pr_number, fix_options_comment, token)
+    except Exception as e:
+        logger.warning(f"Failed to post fix options comment: {e}")
+
+    # Listen for /apply-fix or /apply-and-commit commands
+    from api.github_api import get_pr_comments, detect_apply_fix_command, generate_code_fixes_with_copilot, commit_code_changes
+    comments = get_pr_comments(owner, repo, pr_number, token)
+    # Optionally, fetch list of users with write access for approval (not implemented here)
+    # approval_users = ...
+    apply_fix = False
+    apply_and_commit = False
+    for comment in comments:
+        body = comment.get('body', '').strip().lower()
+        if '/apply-fix' in body:
+            apply_fix = True
+        if '/apply-and-commit' in body:
+            apply_and_commit = True
+    if apply_fix or apply_and_commit:
+        try:
+            # Use review_comment as context for the LLM/code-fix engine
+            try:
+                # Pass review_comment as an input to the code fix generator (Copilot/OpenAI)
+                fixed_files = generate_code_fixes_with_copilot(
+                    code_diff, review_comment, pf_api_key
+                )
+            except NotImplementedError:
+                # For demo, show a dummy patch preview if not implemented
+                dummy_patch = {'example.py': '# Example fix\nprint("Hello, fixed!")\n'}
+                if apply_fix:
+                    patch_preview = '\n'.join([
+                        f"**{path}**\n```diff\n{dummy_patch[path]}\n```" for path in dummy_patch
+                    ])
+                    post_pr_comment(
+                        owner, repo, pr_number,
+                        f"### 🤖 Suggested Fixes (Preview)\n{patch_preview}\n\n*Copilot code fix generation is not implemented in this demo.*",
+                        token
+                    )
+                if apply_and_commit:
+                    post_pr_comment(
+                        owner, repo, pr_number,
+                        "Copilot code fix generation and commit is not implemented.",
+                        token
+                    )
+                return {"status": 200, "body": "Fix feature not implemented."}
+            if not fixed_files or not isinstance(fixed_files, dict):
+                post_pr_comment(
+                    owner, repo, pr_number,
+                    "No fixable suggestions were found or fixes could not be generated based on the review and guidelines.",
+                    token
+                )
+                return {"status": 200, "body": "No fixable suggestions."}
+            if apply_fix:
+                patch_preview = '\n'.join([
+                    f"**{path}**\n```diff\n{fixed_files[path]}\n```" for path in fixed_files
+                ])
+                post_pr_comment(owner, repo, pr_number, f"### 🤖 Suggested Fixes (Preview)\n{patch_preview}", token)
+            if apply_and_commit:
+                try:
+                    commit_msg = f"chore(bot): apply automated fixes for PR #{pr_number}"
+                    branch = data["pull_request"]["head"]["ref"]
+                    commit_code_changes(owner, repo, branch, fixed_files, commit_msg, token)
+                    post_pr_comment(owner, repo, pr_number, "✅ Automated fixes have been committed to this branch.", token)
+                except Exception as e:
+                    logger.error(f"Failed to commit code fixes: {e}")
+                    post_pr_comment(owner, repo, pr_number, f"Failed to commit code fixes: {e}", token)
+                    return {"status": 500, "body": "Failed to commit code fixes."}
+        except Exception as e:
+            logger.error(f"Failed to generate code fixes: {e}")
+            post_pr_comment(owner, repo, pr_number, f"Failed to generate code fixes: {e}", token)
+            return {"status": 500, "body": "Failed to generate code fixes."}
+
     return {"status": status, "body": "Review posted."}
 
 # Security Note:
