@@ -112,7 +112,7 @@ Review follows C# standards for Billing-Service.
 ---
 
 ## Architecture Overview
-```mermaid
+```text
 graph TD;
     A[GitHub Pull Request] --> B[GitHub Webhook Event (pull_request)];
     B --> C[Azure Static Web App Function API];
