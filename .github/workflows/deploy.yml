@@ -1,8 +1,6 @@
-name: Deploy GitHub AI Review Bot (Static Web App + Function)
+name: GitHub AI Review Bot
 
 on:
-  push:
-    branches: [main]
   pull_request:
     branches: [main]
 

@@ -1,6 +1,6 @@
 # 🤖 GitHub AI Code Review Bot
 
-Automatically reviews GitHub pull requests using GPT-4o, Azure Prompt Flow, and project-specific coding guidelines.
+Automatically reviews GitHub pull requests using GPT-4o, Azure Prompt Flow, and project-specific coding guidelines. Now supports automated code fixes via a dedicated Prompt Flow endpoint and secure secret management with Azure Key Vault.
 
 ---
 
@@ -11,13 +11,20 @@ Automatically reviews GitHub pull requests using GPT-4o, Azure Prompt Flow, and 
 - Posts feedback as a GitHub App bot
 - Serverless architecture using Azure Static Web Apps
 - Fully automated CI/CD and secret management
+- **Automated Code Fixes (Copilot/Prompt Flow Integration):**
+  - After review, the bot can apply code fixes using a dedicated Prompt Flow endpoint.
+  - Trigger by commenting `/apply-fix` (preview only) or `/apply-and-commit` (auto-commit) on a PR.
+  - Uses a separate Azure Prompt Flow endpoint for code fixes: `https://code-fix-flow.eastus2.inference.ml.azure.com/score`.
+  - Secret for code-fix flow: `prompt-flow-api-key-2` in Azure Key Vault.
+  - The bot will preview or commit fixes as requested, using the output from the code-fix Prompt Flow.
+  - If no fix is possible (per guidelines or context), the bot will inform you in the PR.
 
 ## 🧠 Tech Stack
 - GPT-4o via Azure Prompt Flow
 - Azure AI Search (Semantic Index)
 - Azure Functions (Python)
 - GitHub Apps & Webhooks
-- Azure Key Vault
+- Azure Key Vault (all secrets, including code-fix Prompt Flow)
 - GitHub Actions CI/CD
 
 ## 📘 License
@@ -48,6 +55,7 @@ Automatically review code commits and pull requests in GitHub using an LLM (GPT-
 - Follows organization guidelines (per project/language)
 - Detects style violations, vague commit messages, insecure code, or anti-patterns
 - Posts actionable feedback directly to the GitHub PR as a bot
+- **Now supports automated code fixes via Prompt Flow**
 
 ## Prerequisites
 - Azure Subscription
@@ -55,6 +63,7 @@ Automatically review code commits and pull requests in GitHub using an LLM (GPT-
 - Azure AI Studio access
 - Azure AI Search resource
 - Azure Static Web App (Function enabled)
+- Azure Key Vault (for all secrets)
 
 ## Setup Guide
 ### 1. Create GitHub App
@@ -72,16 +81,18 @@ Automatically review code commits and pull requests in GitHub using an LLM (GPT-
 - Create:
   - Azure Static Web App (with Python Function backend)
   - Azure Key Vault:
-    - GITHUB_APP_ID
-    - GITHUB_PRIVATE_KEY_PEM
-    - GITHUB_WEBHOOK_SECRET
-    - PROMPT_FLOW_API_KEY
-    - AI_SEARCH_ENDPOINT
+    - github-app-id
+    - github-private-key-pem
+    - github-webhook-secret
+    - prompt-flow-api-key
+    - ai-search-endpoint
+    - prompt-flow-api-key-2 (for code-fix Prompt Flow)
   - Azure AI Search:
     - Upload guideline docs
     - Configure semantic search index
   - Azure AI Studio:
-    - Upload and deploy Prompt Flow
+    - Upload and deploy Prompt Flow for review
+    - Upload and deploy Prompt Flow for code-fix (separate endpoint)
 
 ### 3. Deploy Using GitHub Actions
 - Push to main branch
@@ -112,14 +123,17 @@ Review follows C# standards for Billing-Service.
 ---
 
 ## Architecture Overview
-```mermaid
+```text
 graph TD;
     A[GitHub Pull Request] --> B[GitHub Webhook Event (pull_request)];
     B --> C[Azure Static Web App Function API];
-    C --> D[Azure Prompt Flow];
+    C --> D[Azure Prompt Flow (review endpoint)];
+    C --> F[Azure Prompt Flow (code-fix endpoint)];
     D --> E[Azure Function: Post PR Comment]
+    F --> E
     C -->|Validates webhook, fetches diff, detects language, reads .guidelines.yml| D
     D -->|Retrieves guidelines, generates review| E
+    F -->|Generates code fixes, returns fixed files| E
 ```
 
 ---
@@ -129,16 +143,16 @@ graph TD;
 github-ai-review-bot/
 ├── api/
 │   ├── main.py                 # Azure Function for webhook
-│   ├── github_api.py           # Fetch PR data, post comments
-│   └── config.py               # Read secrets from Azure Key Vault
+│   ├── github_api.py           # Fetch PR data, post comments, code-fix integration
+│   └── config.py               # Read secrets from Azure Key Vault, all endpoints
 │
 ├── prompt_flow/
-│   ├── flow.dag.yaml           # Prompt Flow DAG
-│   ├── prompt.jinja            # LLM prompt template
-│   └── schema.json             # I/O schema
+│   ├── flow.dag.yaml           # Prompt Flow DAG (review)
+│   ├── prompt.jinja            # LLM prompt template (review)
+│   └── schema.json             # I/O schema (review)
 │
 ├── guidelines_index/
-│   ├── python_guidelines.md
+│   ├── python_guidelines.txt
 │   ├── js_commit_rules.md
 │   └── billing_project_rules.pdf
 │
@@ -147,13 +161,14 @@ github-ai-review-bot/
 │
 ├── .env
 ├── requirements.txt
+├── test_main.py                # Integration tests for review and code-fix flows
 └── README.md
 ```
 
 ---
 
 ## Prompt Flow Inputs & Template
-### Inputs
+### Inputs (Review Flow)
 | Input Field   | Source         | Description                       |
 |--------------|----------------|-----------------------------------|
 | commit_msg    | GitHub PR      | PR's latest commit message        |
@@ -162,7 +177,13 @@ github-ai-review-bot/
 | language      | File detection | Python, JS, C#, etc.              |
 | retrieved_docs| AI Search      | Guidelines for language/project   |
 
-### Prompt Template (prompt.jinja)
+### Inputs (Code-Fix Flow)
+| Input Field         | Source         | Description                       |
+|--------------------|----------------|-----------------------------------|
+| code_diff          | GitHub API     | Changed lines/files               |
+| review_suggestions | Review Flow    | Suggestions from review           |
+
+### Prompt Template (prompt.jinja, review)
 ```jinja
 system:
 You are a senior AI software reviewer. You review pull requests for style, clarity, and security based on company guidelines. Be helpful, constructive, and kind. You may first reason through the review silently, then respond in the structured format.
@@ -207,8 +228,9 @@ Tone: Friendly, actionable, concise, and encouraging.
 | github-app-id          | Identify GitHub App                   |
 | github-private-key-pem | Sign JWT to get installation token    |
 | github-webhook-secret  | Verify webhook authenticity           |
-| prompt-flow-api-key    | Authenticate Prompt Flow calls        |
+| prompt-flow-api-key    | Authenticate review Prompt Flow calls |
 | ai-search-endpoint     | Access guideline index                |
+| prompt-flow-api-key-2  | Authenticate code-fix Prompt Flow     |
 
 ---
 
@@ -221,11 +243,15 @@ Tone: Friendly, actionable, concise, and encouraging.
     - Authenticates with GitHub API using JWT
     - Fetches code diff and commit message
     - Detects project or reads from .guidelines.yml
-    - Sends all inputs to Prompt Flow
-4. Prompt Flow:
+    - Sends all inputs to Prompt Flow (review)
+    - If `/apply-fix` or `/apply-and-commit` is triggered, sends diff and suggestions to code-fix Prompt Flow
+4. Prompt Flow (review):
     - Retrieves relevant guidelines from Azure AI Search
     - Generates code review using GPT-4o
-5. Function posts formatted feedback as a comment using GitHub App bot
+5. Prompt Flow (code-fix):
+    - Receives diff and suggestions, returns fixed files
+6. Function posts formatted feedback as a comment using GitHub App bot
+7. If `/apply-and-commit`, bot commits code-fix output to PR branch
 
 ---
 
@@ -242,11 +268,13 @@ Tone: Friendly, actionable, concise, and encouraging.
 
 ## Final Benefits
 - Project- and language-aware reviews
+- Automated code fixes (Copilot-like, via Prompt Flow)
 - Lightweight, serverless backend (Static Web App + Function)
 - No manual configuration per repo
 - Fast visual prompt iteration with Prompt Flow
 - Simple, secure secret management with Key Vault
 - CI/CD streamlined using GitHub Actions
+- Integration and test coverage for both review and code-fix flows
 
 ---
 
