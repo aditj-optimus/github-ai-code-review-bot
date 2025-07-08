@@ -54,8 +54,8 @@ Built by Adit Jain using Microsoft Azure, OpenAI, and GitHub APIs.
 Automatically review code commits and pull requests in GitHub using an LLM (GPT-4o).
 - Follows organization guidelines (per project/language)
 - Detects style violations, vague commit messages, insecure code, or anti-patterns
-- Posts actionable feedback directly to the GitHub PR as a bot
-- **Now supports automated code fixes via Prompt Flow**
+- Posts actionable feedback directly to the GitHub PR as a 
+- Supports automated code fixes via Prompt Flow
 
 ## Prerequisites
 - Azure Subscription
